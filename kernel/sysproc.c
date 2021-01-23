@@ -6,6 +6,33 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
+uint64 freepages_cnt(void);
+uint64 nproc_cnt(void);
+
+uint64
+sys_sysinfo(void)
+{
+	uint64 p;
+	if(argaddr(0, &p)<0)
+		return -1;
+	
+	uint64 pages_cnt=freepages_cnt();
+	uint64 freemem=pages_cnt*PGSIZE;
+	uint64 nproc=nproc_cnt();
+	struct sysinfo tmp={freemem,nproc};
+	if(0>copyout(myproc()->pagetable,p,(char*)&tmp,sizeof(struct sysinfo)))return -1;
+	return 0;		
+}
+uint64
+sys_trace(void)
+{
+	int mask;
+	if(argint(0, &mask)<0)
+		return -1;
+	myproc()->trace_mask=mask;
+	return 0;
+}
 
 uint64
 sys_exit(void)
