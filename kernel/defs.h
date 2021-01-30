@@ -140,6 +140,8 @@ int             fetchaddr(uint64, uint64*);
 void            syscall();
 
 // trap.c
+//my lab
+int handle_page_fault(struct proc*,uint64);
 extern uint     ticks;
 void            trapinit(void);
 void            trapinithart(void);
@@ -154,6 +156,8 @@ void            uartputc_sync(int);
 int             uartgetc(void);
 
 // vm.c
+//my lab
+void vmprint(pagetable_t);
 void            kvminit(void);
 void            kvminithart(void);
 uint64          kvmpa(uint64);

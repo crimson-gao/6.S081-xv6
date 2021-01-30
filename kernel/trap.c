@@ -28,7 +28,28 @@ trapinithart(void)
 {
   w_stvec((uint64)kernelvec);
 }
-
+//my lab
+int handle_page_fault(struct proc* p,uint64 va){
+    if(va>=p->sz||va<p->trapframe->sp){
+        //printf("\nillegal va\n");
+        p->killed=1;
+        return -1;
+    }
+    uint64 r_va=PGROUNDDOWN(va);
+    void* mem =kalloc();
+    if(mem == 0){
+        p->killed=1;
+        //printf("\nnot enough kalloc\n");
+        return -2;
+    }
+    memset(mem, 0, PGSIZE);
+    if(mappages(p->pagetable, r_va, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+        kfree(mem);
+        p->killed=1;
+        return -3;
+    }
+    return 0;
+}
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -68,9 +89,34 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
+      //my lab
+      uint64 cause=r_scause();
+      //uint64 va=r_stval();
+      if(cause==13||cause==15){
+          //handle_page_fault(p,va);
+          uint64 va = r_stval();
+          if (va < p->sz && va > PGROUNDDOWN(p->trapframe->sp))
+          {
+              uint64 ka = (uint64) kalloc();
+              if (ka == 0) p->killed = -1;
+              else
+              {
+                  memset((void*)ka, 0, PGSIZE);
+                  va = PGROUNDDOWN(va);
+                  if (mappages(p->pagetable, va, PGSIZE, ka, PTE_U | PTE_W| PTE_R) != 0)
+                  {
+                      kfree((void*)ka);
+                      p->killed = -1;
+                  }
+              }
+          }
+          else p->killed = -1;
+      }else{
+          printf("usertrap(): unexpected scause %p pid=%d\n", cause, p->pid);
+          printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+          p->killed = 1;
+      }
+
   }
 
   if(p->killed)
