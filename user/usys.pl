@@ -14,7 +14,9 @@ sub entry {
     print " ecall\n";
     print " ret\n";
 }
-	
+# mylab
+entry("sigalarm");
+entry("sigreturn");
 entry("fork");
 entry("exit");
 entry("wait");

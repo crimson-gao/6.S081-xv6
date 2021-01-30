@@ -175,6 +175,7 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+	$U/_alarmtest\
 
 
 
@@ -235,7 +236,7 @@ UPROGS += \
 	$U/_nettests
 endif
 
-UEXTRA=
+UEXTRA= addr2line
 ifeq ($(LAB),util)
 	UEXTRA += user/xargstest.sh
 endif
