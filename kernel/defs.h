@@ -60,6 +60,13 @@ void            ramdiskintr(void);
 void            ramdiskrw(struct buf*);
 
 // kalloc.c
+
+//my lab
+void increase_cnt(uint64);
+void decrease_cnt(uint64);
+char get_page_cnt(uint64);
+void set_page_cnt(uint64,char);
+
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
@@ -140,6 +147,8 @@ int             fetchaddr(uint64, uint64*);
 void            syscall();
 
 // trap.c
+uint64 handle_page_fault(uint64);
+void backtrace();
 extern uint     ticks;
 void            trapinit(void);
 void            trapinithart(void);
@@ -154,6 +163,10 @@ void            uartputc_sync(int);
 int             uartgetc(void);
 
 // vm.c
+//my lab
+pte_t *
+walk(pagetable_t, uint64, int);
+
 void            kvminit(void);
 void            kvminithart(void);
 uint64          kvmpa(uint64);

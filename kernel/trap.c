@@ -15,6 +15,14 @@ extern char trampoline[], uservec[], userret[];
 void kernelvec();
 
 extern int devintr();
+void backtrace(){
+    uint64 sp=r_fp();
+    uint64 g=sp;
+    while(sp<PGROUNDUP(g)){
+        printf("%p\n",sp-8);
+        sp=*(uint64*)(sp-16);
+    }
+}
 
 void
 trapinit(void)
@@ -27,6 +35,42 @@ void
 trapinithart(void)
 {
   w_stvec((uint64)kernelvec);
+}
+uint64 handle_page_fault(uint64 va){
+    va = PGROUNDDOWN(va);
+    pagetable_t p = myproc()->pagetable;
+    pte_t* pte = walk(p, va, 0);
+    uint64 pa = PTE2PA(*pte);
+    uint flags = PTE_FLAGS(*pte);
+
+    if(!(flags & PTE_COW)){
+        printf("not cow\n");
+        return -2; // not cow page
+    }
+
+    uint ref = get_page_cnt(pa);
+    if(ref > 1){
+        // ref > 1, alloc a new page
+        char* mem = kalloc();
+        if(mem == 0)
+            goto bad;
+        memmove(mem, (char*)pa, PGSIZE);
+        *pte&=~PTE_V;
+        if(mappages(p, va, PGSIZE, (uint64)mem, (flags & (~PTE_COW)) | PTE_W) != 0){
+            kfree(mem);
+            goto bad;
+        }
+        *pte|=PTE_V;
+        kfree((void*)pa);
+    }else{
+        // ref = 1, use this page directly
+        *pte = ((*pte) & (~PTE_COW)) | PTE_W;
+    }
+    return 0;
+
+    bad:
+
+    return -1;
 }
 
 //
@@ -65,9 +109,16 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } else if(r_scause()==15){
+      if(handle_page_fault(r_stval())!=0){
+          p->killed=1;
+          printf("page fault interrupt fail\n");
+      };
+  }else if((which_dev = devintr()) != 0){
     // ok
+
   } else {
+      backtrace();
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;

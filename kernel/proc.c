@@ -214,13 +214,13 @@ userinit(void)
   struct proc *p;
 
   p = allocproc();
+  //printf("alloc ok");
   initproc = p;
   
   // allocate one user page and copy init's instructions
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
-
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
   p->trapframe->sp = PGSIZE;  // user stack pointer
@@ -288,15 +288,10 @@ fork(void)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
-
   safestrcpy(np->name, p->name, sizeof(p->name));
-
   pid = np->pid;
-
   np->state = RUNNABLE;
-
   release(&np->lock);
-
   return pid;
 }
 
@@ -422,6 +417,7 @@ wait(uint64 addr)
           pid = np->pid;
           if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
                                   sizeof(np->xstate)) < 0) {
+              printf("wait copyout fail\n");
             release(&np->lock);
             release(&p->lock);
             return -1;

@@ -57,6 +57,7 @@ struct cmd *parsecmd(char*);
 void
 runcmd(struct cmd *cmd)
 {
+   // printf("run cmd %s\n",cmd);
   int p[2];
   struct backcmd *bcmd;
   struct execcmd *ecmd;

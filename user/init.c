@@ -31,6 +31,7 @@ main(void)
       exit(1);
     }
     if(pid == 0){
+        //printf("fork seed!\n");
       exec("sh", argv);
       printf("init: exec sh failed\n");
       exit(1);

@@ -189,6 +189,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if(do_free){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
+      //kfree((void*)pa);
     }
     *pte = 0;
   }
@@ -308,27 +309,49 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
-  pte_t *pte;
-  uint64 pa, i;
-  uint flags;
-  char *mem;
+//  pte_t *pte;
+//  uint64 pa, i;
+//  uint flags;
+//  for(i = 0; i < sz; i += PGSIZE){
+//    if((pte = walk(old, i, 0)) == 0)
+//      panic("uvmcopy: pte should exist");
+//    if((*pte & PTE_V) == 0)
+//      panic("uvmcopy: page not present");
+//    pa = PTE2PA(*pte);
+//      //cow lazy copy
+//    //clear PTE_W bit set
+//      *pte = ((*pte) & (~PTE_W)) | PTE_COW;
+//    flags = PTE_FLAGS(*pte);
+//
+//    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+//
+//      printf("uvmcopy cant map cow\n");
+//      goto err;
+//    }
+    pte_t *pte;
+    uint64 pa, i;
+    uint flags;
 
-  for(i = 0; i < sz; i += PGSIZE){
-    if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
-    if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
-    pa = PTE2PA(*pte);
-    flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
-      goto err;
+    for(i = 0; i < sz; i += PGSIZE){
+        if((pte = walk(old, i, 0)) == 0)
+            panic("uvmcopy: pte should exist");
+        if((*pte & PTE_V) == 0)
+            panic("uvmcopy: page not present");
+        pa = PTE2PA(*pte);
+        flags = PTE_FLAGS(*pte);
+
+        *pte = ((*pte) & (~PTE_W)) | PTE_COW; // set parent's page unwritable
+        // printf("c: %p %p %p\n", i, ((flags & (~PTE_W)) | PTE_COW), *pte);
+        // map child's page with page unwritable
+        if(mappages(new, i, PGSIZE, (uint64)pa, (flags & (~PTE_W)) | PTE_COW) != 0){
+            goto err;
+        }
+        increase_cnt(pa);
     }
-  }
-  return 0;
+    return 0;
+//    increase_cnt(pa);
+//  }
+//  return 0;
 
  err:
   uvmunmap(new, 0, i / PGSIZE, 1);
@@ -355,15 +378,56 @@ int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
-
+  pte_t *pte;
+  //int flags;
+  //struct proc* p=myproc();
   while(len > 0){
+//    va0 = PGROUNDDOWN(dstva);
+//
+//    if(va0 >= MAXVA)
+//        return -1;
+//    pte = walk(pagetable, va0, 0);
+//    if(pte==0){
+//        printf("copyout fail\n");
+//        return -1;
+//    }
+//    pa0=PTE2PA(*pte);
+//    if((*pte)&PTE_COW){
+//        if((pa0=handle_page_fault(va0,p))==0){
+//            printf("copyout handle cow fail\n");
+//            return -1;
+//        }
+//    }
     va0 = PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
+    pte=walk(pagetable,va0,0);
+    if(pte==0||((*pte)&PTE_V)==0||((*pte)&PTE_U)==0){
+        printf("copyout : pte not exist or not accessible to user\n");
+        return -1;
+    }
+    pa0=PTE2PA(*pte);
+    if((*pte)&PTE_COW){
+        char *mem=kalloc();
+        if(mem==0){
+            printf("copyout: out of memory\n");
+            return -1;
+        }
+        memmove(mem,(char *)pa0,PGSIZE);
+        // set PTE_W , unset PTW_COW
+        (*pte)|=PTE_W;
+        (*pte)&=~PTE_COW;
+        int perm=PTE_FLAGS((*pte));
+        (*pte)&=~PTE_V;
+        if(mappages(pagetable, va0, PGSIZE, (uint64)mem, perm) != 0){
+            kfree(mem);
+            return -1;
+        }
+        (*pte)|=PTE_V;
+        pa0=(uint64)mem; // NOT SURE
+    }
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
+
     memmove((void *)(pa0 + (dstva - va0)), src, n);
 
     len -= n;
