@@ -16,6 +16,13 @@ void kernelvec();
 
 extern int devintr();
 
+uint get_ticks(){
+    uint res=0;
+    acquire(&tickslock);
+    res=ticks;
+    release(&tickslock);
+    return res;
+}
 void
 trapinit(void)
 {
